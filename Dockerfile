@@ -25,8 +25,7 @@ COPY . /app
 # We skip dev dependencies and optimize the autoloader for production speed
 RUN composer install --no-dev --optimize-autoloader
 
-# --- FINAL CRITICAL FIX (Hostname + Wait) ---
-# We are using the correct, capitalized internal hostname: MySQL.
+# We use the capitalized internal hostname: MySQL.
 # Wait for the database host to become available on port 3306 (up to 30 seconds)
 # before running the migration. This fixes both the resolution and timing errors.
 RUN nc -z -w 30 MySQL 3306 && php artisan migrate --force
@@ -38,15 +37,3 @@ EXPOSE 9000
 # Command to run when the container starts
 # This starts the PHP-FPM process to handle web requests
 CMD ["php-fpm"]
-```eof
-
-**Action:**
-
-1.  **Replace** your Dockerfile with the text provided above.
-2.  **Commit** and push the change to trigger a new deployment.
-
-This version should pass the build step because it:
-1.  Resolves the hostname correctly (`MySQL`).
-2.  Waits for the database to be ready (30 seconds) before running `php artisan migrate`.
-
-I truly hope this resolves your long-standing deployment issue.

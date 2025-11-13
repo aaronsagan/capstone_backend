@@ -2,13 +2,14 @@
 # We use a stable, recommended PHP base image. Change '8.2' if your app uses a different version.
 FROM php:8.2-fpm-alpine AS base
 
-# Install necessary dependencies, including the MySQL client and pdo_mysql extension
-# The 'alpine' image requires using 'apk' for package management.
+# Install necessary dependencies, including the MySQL client, git, unzip, and now netcat
+# Netcat (netcat-openbsd) is used to reliably wait for the database service to be ready.
 RUN apk add --no-cache \
     mysql-client \
     git \
     unzip \
-    # Install the critical pdo_mysql extension that was missing
+    netcat-openbsd \
+    # Install the critical pdo_mysql extension
     && docker-php-ext-install pdo_mysql
 
 # Install Composer globally
@@ -24,10 +25,11 @@ COPY . /app
 # We skip dev dependencies and optimize the autoloader for production speed
 RUN composer install --no-dev --optimize-autoloader
 
-# Run the database migrations
-# Railway will run this command, which will now succeed because pdo_mysql is installed
-# The --force flag confirms the migration in a non-interactive environment (like Railway)
-RUN php artisan migrate --force
+# --- CRITICAL FIX FOR "CONNECTION REFUSED" ---
+# Wait for the database host to become available on port 3306 (up to 30 seconds).
+# The internal host name in Railway is usually the service name, which should be 'mysql'.
+# The '&&' ensures 'migrate' only runs if the connection check succeeds.
+RUN nc -z -w 30 mysql 3306 && php artisan migrate --force
 
 # Expose the PHP-FPM port (default for PHP-FPM is 9000)
 # Railway will use this port to connect to your service
